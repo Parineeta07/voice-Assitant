@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { ShieldAlert, Mic } from "lucide-react";
 
@@ -10,8 +10,20 @@ export default function App() {
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
   const [risk, setRisk] = useState(0);
+  const recognitionRef = useRef(null);
 
-  const startListening = () => {
+  const toggleListening = () => {
+
+    if (listening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+      setListening(false);
+      window.speechSynthesis.cancel(); // Stop the AI from speaking
+      return;
+    }
+
+    window.speechSynthesis.cancel(); // Clear any ongoing speech before starting
 
     const SpeechRecognition =
       window.SpeechRecognition ||
@@ -23,6 +35,7 @@ export default function App() {
     }
 
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
 
     recognition.continuous = false;
     recognition.lang = "en-US";
@@ -54,10 +67,14 @@ Analyze this message for phishing/scam behavior.
 Message:
 "${text}"
 
-Return:
-- Threat Level
-- Scam Type
-- Warning
+Return your response in this exact format:
+[SCORE: X]
+Threat Level: ...
+Scam Type: ...
+Warning: ...
+
+Where X is a number from 0 to 100 representing the threat percentage. 
+CRITICAL: If the message is completely safe, benign, or just a normal greeting (like "hi", "hello", or introducing a name), you MUST return [SCORE: 0]. Only give a score above 0 if there is a genuine risk.
 `;
 
     try {
@@ -82,7 +99,7 @@ Return:
               {
                 role: "system",
                 content:
-                  "You are a cybersecurity AI."
+                  "You are a cybersecurity AI. Always provide a threat score between 0 and 100."
               },
 
               {
@@ -112,31 +129,36 @@ Return:
         data?.choices?.[0]?.message?.content ||
         "Threat detected.";
 
-      setResponse(aiReply);
-
-      let threatScore = 20;
-
-      const lowerText =
-        text.toLowerCase();
-
-      if (
-        lowerText.includes("otp") ||
-        lowerText.includes("bank") ||
-        lowerText.includes("password")
-      ) {
-        threatScore = 90;
+      // Parse the score from the AI reply
+      const scoreMatch = aiReply.match(/\[SCORE:\s*(\d+)\]/i);
+      let threatScore = 0; // Starts at 0
+      
+      if (scoreMatch && scoreMatch[1]) {
+        threatScore = parseInt(scoreMatch[1], 10);
+      } else {
+        // Fallback basic logic if AI doesn't format it properly
+        const lowerText = text.toLowerCase();
+        if (
+          lowerText.includes("otp") ||
+          lowerText.includes("bank") ||
+          lowerText.includes("password")
+        ) {
+          threatScore = 90;
+        } else if (
+          lowerText.includes("urgent") ||
+          lowerText.includes("immediately")
+        ) {
+          threatScore = 40;
+        }
       }
 
-      if (
-        lowerText.includes("urgent") ||
-        lowerText.includes("immediately")
-      ) {
-        threatScore += 5;
-      }
+      // Remove the [SCORE: X] part from the text shown/spoken to the user
+      const cleanReply = aiReply.replace(/\[SCORE:\s*\d+\]\n*/i, "").trim();
 
+      setResponse(cleanReply);
       setRisk(threatScore);
 
-      speak(aiReply);
+      speak(cleanReply);
 
     } catch (err) {
 
@@ -201,7 +223,7 @@ Return:
 
       <button
 
-        onClick={startListening}
+        onClick={toggleListening}
 
         className="
           mt-8
