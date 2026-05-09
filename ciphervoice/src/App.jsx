@@ -74,7 +74,8 @@ Scam Type: ...
 Warning: ...
 
 Where X is a number from 0 to 100 representing the threat percentage. 
-CRITICAL: If the message is completely safe, benign, or just a normal greeting (like "hi", "hello", or introducing a name), you MUST return [SCORE: 0]. Only give a score above 0 if there is a genuine risk.
+CRITICAL: If the message asks for or mentions an OTP, password, PIN, or bank details, you MUST return a high score (e.g., [SCORE: 90]).
+If the message is completely safe, benign, or just a normal greeting (like "hi", "hello", or introducing a name), you MUST return [SCORE: 0]. Only give a score above 0 if there is a genuine risk.
 `;
 
     try {
@@ -132,24 +133,25 @@ CRITICAL: If the message is completely safe, benign, or just a normal greeting (
       // Parse the score from the AI reply
       const scoreMatch = aiReply.match(/\[SCORE:\s*(\d+)\]/i);
       let threatScore = 0; // Starts at 0
-      
+
       if (scoreMatch && scoreMatch[1]) {
         threatScore = parseInt(scoreMatch[1], 10);
-      } else {
-        // Fallback basic logic if AI doesn't format it properly
-        const lowerText = text.toLowerCase();
-        if (
-          lowerText.includes("otp") ||
-          lowerText.includes("bank") ||
-          lowerText.includes("password")
-        ) {
-          threatScore = 90;
-        } else if (
-          lowerText.includes("urgent") ||
-          lowerText.includes("immediately")
-        ) {
-          threatScore = 40;
-        }
+      }
+
+      // Keyword overrides (guaranteed minimum score for dangerous words)
+      const lowerText = text.toLowerCase();
+      if (
+        lowerText.includes("otp") ||
+        lowerText.includes("bank") ||
+        lowerText.includes("password") ||
+        lowerText.includes("pin")
+      ) {
+        threatScore = Math.max(threatScore, 90);
+      } else if (
+        lowerText.includes("urgent") ||
+        lowerText.includes("immediately")
+      ) {
+        threatScore = Math.max(threatScore, 40);
       }
 
       // Remove the [SCORE: X] part from the text shown/spoken to the user
