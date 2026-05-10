@@ -140,6 +140,8 @@ If the message is completely safe, benign, or just a normal greeting (like "hi",
 
       // Keyword overrides (guaranteed minimum score for dangerous words)
       const lowerText = text.toLowerCase();
+      let isCriticalKeyword = false;
+      
       if (
         lowerText.includes("otp") ||
         lowerText.includes("bank") ||
@@ -147,6 +149,7 @@ If the message is completely safe, benign, or just a normal greeting (like "hi",
         lowerText.includes("pin")
       ) {
         threatScore = Math.max(threatScore, 90);
+        isCriticalKeyword = true;
       } else if (
         lowerText.includes("urgent") ||
         lowerText.includes("immediately")
@@ -155,7 +158,11 @@ If the message is completely safe, benign, or just a normal greeting (like "hi",
       }
 
       // Remove the [SCORE: X] part from the text shown/spoken to the user
-      const cleanReply = aiReply.replace(/\[SCORE:\s*\d+\]\n*/i, "").trim();
+      let cleanReply = aiReply.replace(/\[SCORE:\s*\d+\]\n*/i, "").trim();
+
+      if (isCriticalKeyword) {
+        cleanReply = "🚨 CRITICAL THREAT DETECTED: They are asking for sensitive information like OTP or Password!\n\n" + cleanReply;
+      }
 
       setResponse(cleanReply);
       setRisk(threatScore);
@@ -272,19 +279,6 @@ If the message is completely safe, benign, or just a normal greeting (like "hi",
           </p>
 
         </div>
-
-        <div className="bg-zinc-900 p-5 rounded-2xl">
-
-          <h2 className="text-2xl font-bold mb-3">
-            Threat Score
-          </h2>
-
-          <p className="text-5xl font-bold text-red-500">
-            {risk}%
-          </p>
-
-        </div>
-
       </div>
 
     </div>
